@@ -1,0 +1,56 @@
+
+scws 1.2.3
+http://www.xunsearch.com/scws/index.php
+http://www.cnblogs.com/bourneli/archive/2012/10/15/2724952.html
+http://www.jb51.net/article/48928.htm
+
+下载：wget http://www.xunsearch.com/scws/down/scws-1.2.3.tar.bz2
+1. 取得 scws-1.2.3 的代码
+wget http://www.xunsearch.com/scws/down/scws-1.2.3.tar.bz2
+
+2. 解开压缩包
+[hightman@d1 ~]$ tar xvjf scws-1.2.3.tar.bz2
+
+3. 进入目录执行配置脚本和编译
+$ cd scws-1.2.3
+$ ./configure --prefix=/usr/local/scws ; make ; make install
+
+4. 检查是否安装成功 
+ls -al /usr/local/scws/lib/libscws.la
+/usr/local/scws/bin/scws -h
+
+5. 试试执行 scws-cli 文件
+
+6 用 wget 下载并解压词典，或从主页下载然后自行解压再将 *.xdb 放入 /usr/local/scws/etc 目录中
+[hightman@d1 ~/scws-1.2.3]$
+ cd /usr/local/scws/etc
+$ wget http://www.xunsearch.com/scws/down/scws-dict-chs-gbk.tar.bz2
+$ wget http://www.xunsearch.com/scws/down/scws-dict-chs-utf8.tar.bz2
+$ tar xvjf scws-dict-chs-gbk.tar.bz2
+$ tar xvjf scws-dict-chs-utf8.tar.bz2
+
+. 如果您需要在 php 中调用分词，建议继续阅读本文安装 php 扩展，否则可跳过不看。
+
+    假设您已经将 scws 按上述步骤安装到 /usr/local/scws 中。
+    安装此扩展要求您的 php 和系统环境安装了相应的 autoconf automake 工具及 phpize 。
+
+    1) 进入源码目录的 phpext/ 目录 ( cd ~/scws-1.2.3 )
+    2) 执行 phpize （在PHP安装目录的bin/目录下）
+    3) 执行 ./configure --with-scws=/usr/local/scws --with-php-config=/usr/local/php/bin/php-config
+    4) 执行 make 然后用 root 身份执行 make install     
+    5) 在 php.ini 中加入以下几行	
+	
+	vi /usr/local/php/etc/php.ini
+
+[scws]
+extension = scws.so
+scws.default.charset = gbk
+scws.default.fpath = /usr/local/scws/etc
+
+service php-fpm restart
+
+    6) 命令行下执行 php -m 就能看到 scws 了或者在 phpinfo() 中看看关于 scws 的部分，记得要重启 web 服务器
+       才能使新的 php.ini 生效。
+    7) 这样就算安装完成了，余下的工作只是PHP代码编写问题了。
+       关于 PHP 扩展的使用说明请参看代码中 phpext/README.md 文件或其它文档章节。
+		/usr/local/scws/bin

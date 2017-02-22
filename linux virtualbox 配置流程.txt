@@ -1,0 +1,303 @@
+
+linux virtualbox 配置流程
+
+virtualbox下载
+https://www.virtualbox.org/wiki/Linux_Downloads
+https://www.virtualbox.org/wiki/Downloads
+wget http://download.virtualbox.org/virtualbox/5.1.12/VirtualBox-5.1-5.1.12_112440_el6-1.x86_64.rpm
+
+------安装时候需要的环境文件------
+yum install qt SDL 
+yum install kernel-headers kernel-devel gcc 
+
+-------安装方式---------------
+ 安装：rpm -ivh VirtualBox-5.1-5.1.12_112440_el6-1.x86_64.rpm
+ 卸载：rpm -e VirtualBox-5.1-5.1.12_112440_el6-1.x86_64
+
+ 
+安装完成之后需要	reboot
+再重新运行/etc/init.d/vboxdrv setup
+------------------------
+附加几个命令：
+启动vnc server：	vncserver
+在服务器端修改vmcserver的密码： 	vncpasswd
+yum 安装命令：
+yum install
+yum clean all 清除缓存
+
+----------------------------------------
+运行下面这条命令，确认 VBoxManage 已经成功安装在你的机器上。
+$ VBoxManage list
+
+
+--------使用VirtualBox常见操作参考--------
+整机克隆来到
+从4.2版开始，加入了虚拟机整机克隆，并解决因网卡、磁盘的uuid相同的问题(当然操作系统的'udev'设置管理也要支持)
+VBoxManage clonevm <uuid>|<name>
+  [--snapshot <uuid>|<name>]
+ [--mode machine|machineandchildren|all]
+ [--options link|keepallmacs|keepnatmacs|keepdisknames]
+ [--name <name>]
+ [--basefolder <basefolder>]
+ [--uuid <uuid>]
+[--register]
+
+$ VBoxManage clonevm ocentos --mode all --name pcentos --basefolder /data/vmos/ --register
+0%...10%...20%...30%...40%...50%...60%...70%...80%...90%...100%
+
+VBoxManage clonevm pde --mode all --name origde --basefolder /home/hto/data/vmos/ --register
+
+解决了之前要克隆一台虚拟机要经过若干个步骤，有些麻烦，现在一条指令即可实现。
+
+---------------
+移除虚拟机
+反注册：VBoxManage unregistervm router
+现在列出时(VBoxManage list vms)可以看到'router'这台vm没有出现。
+
+如果想把这台虚拟机再重新注册回来，可以使用(VBoxManage registervm /data/vmos/router/router.vbox)来将这台vm加入到可用虚拟机列表中，前提是没有删除与之相关的文件(包括从VBoxManage操作或直接文件删除)。
+
+注意：虚拟机在删除时不能直接去相应目录从文件层面上进行删除，那样导致vbox报错。应在反注册时加上'--delete'参数从系统中彻底清除该虚拟机，如果再想要找回该虚拟机时就不可能了，所以在操作前一定要想好(在windows下并没有真正删除文件)。
+
+---------------
+创建host-only网络接口
+VBoxManage hostonlyif create
+会创建一个命为'vboxnet0'这样一个网口，前提为目前没有创建过，如果已经有一块这样的网口的话，将会以'vboxnet1'这样的方式来命名。它自动使用'192.168.56.1'这样的dhcp方式分配的ip地址，你可以为它更改。
+VBoxManage hostonlyif ipconfig vboxnet0 --ip 192.168.18.3 --netmask 255.255.255.224
+
+注意：创建了这样一个网口，但在宿主机上通过'ifconfig'不能看到，因为虚拟机没有使用到它，只有当它被使用时，才会在宿主机上看到。
+
+在4.1下发现这样一个问题：宿主机仅有一个网口(eth0)，采用vyatta做虚拟机的路由，它的主机名为router，在router上虚拟两张网卡，eth0与eth1：前者接入局域网(bridged)，后者(bridged)通过前者连网，且两者在不同网段。在vm1上的网卡(bridged)设置好与router的eth1相关的地址后，刚开始能通过router连接到互联网的主机，但过一会儿，网络开始不通，有时根本就不能通。而4.0没有此现象，后不得不将它们的连接方式改为'hostonlyif'这种。
+
+VBoxManage modifyvm scentos --cpus 2 --memory 1024 --nic1 hostonly --hostonlyadapter1 vboxnet0
+
+---------------
+为虚拟机另加磁盘
+首先需要将运行的机器关闭，运行'VBoxManage list -l vms'看下该虚拟机磁盘控制器使用的情况：
+Storage Controller Name (0):            SATA Controller
+Storage Controller Type (0):            IntelAhci
+Storage Controller Instance Number (0): 0
+Storage Controller Max Port Count (0):  30
+Storage Controller Port Count (0):      30
+Storage Controller Bootable (0):        on
+SATA Controller (0, 0): /data/vmos/srouter/srouter.vdi (UUID: 66a94588-4909-479f-abd2-1d266ed017c9)
+SATA Controller (1, 0): /home/hto/sf/os/vyatta-livecd_6.2.i386.iso (UUID: 0938dde8-5aa3-4c2a-a473-115f91d0c061)
+
+已经有两个端口被用了，这里再为它加一个。
+VBoxManage storageattach pcentos --storagectl  "SATA Controller" --port 2 --device 0 --type hdd --medium /data/vmos/disk/pdisk0.vdi
+
+---------------
+将'.img'镜像文件转为VDI格式的固态虚拟文件
+
+D:\data\vmos\bsdrouter>vboxmanage convertfromraw --format VDI --variant Fixed BSDRP-1.4-full-i386-vga.img bsdrp-full.vdi
+
+Converting from raw image file="BSDRP-1.4-full-i386-vga.img" to file="bsdrp-full.vdi"...
+Creating fixed image with size 256000000 bytes (245MB)...
+
+---------------
+克隆磁盘镜像(固定格式)
+
+VBoxManage clonehd  src_vdi_img des_vdi_img --format VDI --variant Fixed
+
+---------------
+ssh远程管理虚拟机
+在宿主操作系统没有gui时，需要通过vrde协议来连接宿主上的某一端口来安装，或者通过ssh 的'X'转发来实现。
+
+-----------------------------
+将虚拟机跨机器迁移
+直接将'vdi'格式的镜像通过网络传到另外一台机器，vbox版本不要跨太多。下面是一个将windows平台的虚拟机磁盘文件移到高版本的linux虚拟机下。
+
+VBoxManage storagectl "winxp" --name "IDE Controller" --add ide --controller PIIX4 --hostiocache on --bootable on
+VBoxManage: error: Storage controller named 'IDE Controller' already exists
+VBoxManage: error: Details: code VBOX_E_OBJECT_IN_USE (0x80bb000c), component SessionMachine, interface IMachine, callee nsISupports
+Context: "AddStorageController(Bstr(pszCtl).raw(), StorageBus_IDE, ctl.asOutParam())" at line 879 of file VBoxManageStorageController.cpp
+
+hto@debian:~$ VBoxManage storagectl "winxp" --name "IDE Controller" --remove
+hto@debian:~$ VBoxManage storagectl "winxp" --name "IDE Controller" --add ide --controller PIIX4 --hostiocache on --bootable on
+hto@debian:~$ VBoxManage storageattach "winxp" --storagectl "IDE Controller" --port 0 --device 0 --type hdd --medium /home/hto/data/vmos/winxp/winxp.vdi
+
+-----------------------------
+VirtualBox 4.3 启动虚拟机时显示不能加载 R3模块并退出故障
+
+不能为虚拟电脑打开一个新任务
+
+Unable to load R3 module D:\programfiles\oracle\vbox/VBoxDD.DLL (VBoxDD): GetLastError=1790 (VERR_UNRESOLVED_ERROR).
+
+返回 代码:E_FAIL (0x80004005)
+组件:Console
+界面:IConsole {8ab7c520-2442-4b66-8d74-4ff1e195d2b6}
+
+VirtualBox 升级到 4.3后一直问题不断。发现从最近的某个版本开始，为了安全，要校验进程完整性，那些在运行时要注入Virtualbox进程的模块都要进行校验。于是便出现了软件不兼容等等故障。查一下日志，发现一行：
+supR3HardenedErrorV: supR3HardenedMonitor_LdrLoadDll: rejecting 'C:\Windows\system32\uxtheme.dll': rcNt=0xc0000190
+
+这是因为破解了系统主题文件uxtheme.dll的原因，只能还原系统主题文件uxtheme.dll，再次启动虚拟机就可以了。
+
+解决方法：恢复系统主题文件即可。
+
+完全的参考地址：http://www.aixq.com/post-328.html
+
+---------------------------------------
+日常使用vboxmanage的总结
+
+显示所有虚拟机：vboxmanage list vms
+
+显示所有正在运行的虚拟机：vboxmanage list runningvms
+
+显示虚拟机详细信息：vboxmanage showvminfo winxp
+
+修改虚拟机名称：vboxmanage modifyvm winxp --name winxp_clone
+
+修改虚拟机所占用的cpu内核数：vboxmanage modifyvm winxp --cpus 2
+
+修改虚拟机所占用的内存数量（默认为MB）：vboxmanage modifyvm winxp --memory 2048
+
+启动虚拟机：vboxmanage startvm winxp --type gui|sdl|headless
+在gui环境下默认为gui，也可以使用sdl视频驱动；在没有gui的情况下使用headless在后台启动，当然前提是该vm已经配置好远程连接方式（远程桌面或ssh）。
+
+正常关闭机器：vboxmanage controlvm winxp acpipowerbutton
+
+强行关闭虚拟机：vboxmanage controlvm winxp poweroff
+
+克隆并注册虚拟机：vboxmanage clonevm winxp --name winxp2 --register
+
+修改端口映射规则(将宿主机的本机端口对应到vm上某端口)：vboxmanage modifyvm winxp --natpf1 rule_ssh, tcp, , 8888, 10.0.2.16, 8888
+
+将网络连接修改成桥接：vboxmanage modifyvm winxp --nic1 bridged --bridgeadapter1 eth0
+需要注意的是，接口的编号与新式的linux系统网口编号相似，从1而不是0开始。
+
+磁盘控制器
+
+IDE控制器
+创建：
+VBoxManage storagectl testvm --name "IDE Controller" --add ide
+
+卸载
+VBoxManage storagectl testvm --name "IDE Controller" --remove
+
+SATA Controller
+
+VBoxManage storagectl testvm --name "SATA Controller" --add sata
+
+控制芯片：--controller，主流的选择：IntelAHCI，较低端的用：ICH6，非常早的主板用：PIIX3、4。--sataportcount，用于指定sata的端口号(1-30)。
+
+--hostiocache，是否使用宿主机的I/O缓存。
+
+--bootable，该盘是否可引导。
+
+磁盘存储设备管理
+
+删除存储设备
+VBoxManage closemedium disk /home/freeoa/winxp.vdi --delete
+
+重新设置存储设备在vbox中的uuid，其中my-uuid为指定的新uuid
+VBoxManage storageattach "testvm" --storagectl "IDE Controller" --port 1 --device 0 --type hdd --medium /home/freeoa/winxp.vdi --setuuid my-uuid
+
+显示磁盘信息
+$ vbm showhdinfo ~/data/vm/xp/winxp.vdi 
+UUID:1595311c-3020-4c7a-a311-5c316ffbc7b7
+Accessible:yes
+Logical size:6144 MBytes
+Current size on disk: 6144 MBytes
+Type:normal (base)
+Storage format:VDI
+Format variant:fixed default
+In use by VMs:xp (UUID: ba2f1edb-3d4a-4e74-8680-0623f94fefce)
+Location:/home/hto/data/vm/xp/winxp.vdi
+
+为虚拟硬盘重新分配UUID，即克隆指定的VDI虚拟硬盘
+vbm clonehd <uuid>|<filename> <uuid>|<outputfile>
+VBoxManage clonehd my-uuid /home/hto/data/vm//testvm/testvm2.vdi
+
+修改
+VBoxManage convertfromraw <filename> <outputfile>
+ [--format VDI|VMDK|VHD]
+ [--variant Standard,Fixed,Split2G,Stream,ESX]
+ [--uuid <uuid>] 将raw硬盘转换成vdi虚拟硬盘
+
+VBoxManage modifyhd <uuid>|<filename>
+ [--type normal|writethrough|immutable|shareable|readonly|multiattach]
+ [--autoreset on|off]
+ [--compact] 压缩指定的虚拟硬盘
+ [--resize <megabytes>|--resizebyte <bytes>] 调整其空间大小，对分配了固定大小的磁盘好像无效
+
+挂载到磁盘控制器
+
+VBoxManage storageattach testvm --storagectl "IDE Controller" --port 0 --device 0 --type hdd --medium /home/hto/data/vm/testvm/testvm.vdi
+
+卸载
+VBoxManage storageattach testvm --storagectl "IDE Controller" --port 0 --device 0 --type hdd --medium none
+
+空置占位
+VBoxManage storageattach testvm --storagectl "IDE Controller" --port 0 --device 0 --type hdd --medium emptydrive
+
+虚拟光盘
+
+挂载虚拟光盘
+VBoxManage storageattach testvm --storagectl "IDE Controller" --port 1 --device 0 --type dvddrive --medium /usr/share/virtualbox/VBoxGuestAdditions.iso
+
+卸载虚拟光盘
+VBoxManage storageattach testvm --storagectl "IDE Controller" --port 1 --device 0 --type dvddrive --medium none
+
+常用指令参考
+
+VBoxManage [-v|-version] 显示virtualbox的版本号
+VBoxManage -nologo 隐藏logo
+VBoxManage -convertSettings 允许自动转换设置文件
+VBoxManage -convertSettingsBackup 允许自动转换设置文件，并在转换前作备份
+VBoxManage -convertSettingsIgnore 允许自动转换设置文件，但是不保存结果
+
+$ VBoxManage list runningvms # 列出运行中的虚拟机
+$ VBoxManage controlvm winxp acpipowerbutton # 关闭虚拟机，等价于点击系统关闭按钮，正常关机
+$ VBoxManage controlvm winxp poweroff # 关闭虚拟机，等价于直接关闭电源，非正常关机
+$ VBoxManage controlvm winxp pause # 暂停虚拟机的运行
+$ VBoxManage controlvm winxp resume # 恢复暂停的虚拟机
+$ VBoxManage controlvm winxp savestate # 保存当前虚拟机的运行状态
+
+
+VBoxManage list vms|runningvms 显示列表虚拟机|正在运行的虚拟机
+|ostypes|hostdvds virtualbox支持的系统类型|宿主机的光盘驱动器
+|hostfloppies 宿主机的软盘驱动器
+|hostifs|hostinfo 宿主机的网络接口|宿主机的信息
+|hdds|dvds 已注册的虚拟硬盘|已注册的虚拟光盘
+|floppies|usbhost 已注册的虚拟软盘|宿主机的USB设备
+|usbfilters USB筛选器
+|systemproperties 虚拟机的基本信息
+
+VBoxManage showvminfo <uuid>|<name> 显示指定虚拟机的信息
+[-details] 显示详细信息
+[-statistics] 显示统计信息
+[-machinereadable] 以清晰的格式显示虚拟机信息
+
+VBoxManage registervm <filename> 将指定文件所在的虚拟机添加到列表
+
+VBoxManage unregistervm <uuid>|<name> 从虚拟机列表清除指定的虚拟机
+[-delete] 从虚拟机列表删除指定的虚拟机
+
+VBoxManage createvm -name <name> 创建指定名称的虚拟机
+[-register] 将创建的虚拟机添加到列表
+[-basefolder <path> 指定虚拟机的基础目录
+[-settingsfile <path>] 指定虚拟机配置文件的基础目录
+[-uuid <uuid>] 创建指定uuid的虚拟机
+
+VBoxManage modifyvm <uuid|name> 编辑指定的虚拟机的配置
+[-name <name>] 修改虚拟机的名称
+[-ostype <ostype>]修改虚拟机的操作系统类型
+[-memory <memorysize>] 修改虚拟机的内存大小
+[-vram <vramsize>] 修改虚拟机的显存大小
+[-acpi on|off] 启动或禁止acpi电源管理接口
+[-ioapic on|off] 启动或禁止I/O APIC电源管理接口
+[-pae on|off] 启动或禁止CPU的PAE支持，PAE是
+Physical Address Extension : 物理地址扩展
+[-hwvirtex on|off|default]启动或禁止CPU的硬件虚拟化支持
+[-nestedpaging on|off] 开启或关闭CPU的嵌套页面列表支持
+[-monitorcount <number>] 设置显示器数目，VRDP多用户模式时 [-bioslogofadein on|off] 开启或关闭bioslogo渐显效果
+[-bioslogofadeout on|off] 开启或关闭bioslogo渐隐效果
+[-bioslogodisplaytime <msec>]设置bioslogo显示时间（以毫秒为单位)
+[-bioslogoimagepath <imagepath>]设置bioslogo图像路径，用于自定义bioslogo
+[-biosbootmenu disabled| 设置是否显示bios启动菜单 关闭
+menuonly| 只显示菜单
+messageandmenu] 信息和菜单
+[-biossystemtimeoffset <msec>] 设置bios系统时间补偿（以毫秒为单位）
+[-biospxedebug on|off] 打开或关闭biospxe调试
+[-boot<1-4> none|floppy|dvd|disk|net] 设置启动顺序
+
+参考文章：http://www.cnblogs.com/pbss/articles/1987361.html

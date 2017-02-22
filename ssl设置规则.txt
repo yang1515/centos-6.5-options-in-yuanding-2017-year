@@ -1,0 +1,30 @@
+server {
+        listen 443;
+        server_name test.stu.weixiaobang.net;
+		index index.html index.php;
+        root  /hdfs/wwwroot/preline/AppStu;
+        ssl on;
+        ssl_certificate 1_test.stu.weixiaobang.net_bundle.crt;
+        ssl_certificate_key 2_test.stu.weixiaobang.net.key;
+        ssl_session_timeout 5m;
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+        ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:HIGH:!aNULL:!MD5:!RC4:!DHE;
+        ssl_prefer_server_ciphers on;
+
+		include none.conf;
+        #error_page   404   /404.html;
+        include enable-php.conf;
+        location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$
+        {
+            expires      30d;
+        }
+        location ~ .*\.(js|css)?$
+        {
+            expires      12h;
+        }
+        location ~ /\.
+        {
+            deny all;
+        }
+        access_log off;
+    }

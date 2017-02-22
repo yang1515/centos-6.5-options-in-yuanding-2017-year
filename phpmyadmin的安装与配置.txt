@@ -1,0 +1,26 @@
+phpmyadmin的安装与配置
+
+服务器：centos6.5
+网站服务器架构：LNMP
+	PHP 5.6.22 
+	mysql  Ver 14.14 Distrib 5.6.29
+	nginx version: nginx/1.10.0
+	phpMyAdmin-4.0.10.19
+
+操作步骤：
+	1. cd /home/wwwroot/default
+	2. 下载phpmyadmin。https://www.phpmyadmin.net/files/
+		# wget https://files.phpmyadmin.net/phpMyAdmin/4.0.10.19/phpMyAdmin-4.0.10.19-all-languages.zip
+		# unzip phpMyAdmin-4.0.10.19-all-languages.zip
+		# mv phpMyAdmin-4.0.10.19-all-languages phpmyadmin
+		# cd phpmyadmin
+	3. 复制一个config.inc.php文件
+		# cp config.sample.inc.php config.inc.php
+		# vi config.inc.php
+		具体配置参数：http://www.jb51.net/article/15330.htm
+	4 登录：http://192.168.50.32/phpmyadmin
+	5 现在就可以管理了
+
+遇到的问题：
+	1.  The secret passphrase in configuration (blowfish_secret) is too short.
+	2.	首页空白。版本太高问题造成的。更改低版本后顺利解决。

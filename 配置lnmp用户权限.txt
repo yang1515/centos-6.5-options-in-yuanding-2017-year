@@ -1,0 +1,11 @@
+安装lnmp后，编辑nginx.conf，更改web主目录；
+
+安装完成后，默认web用户为www，新增sftp用户gxt_upload，并更改nginx.conf和php-fpm.conf文件中web用户和组为gxt_upload，同时对web目录更改权限；
+
+vi /usr/local/nginx/conf/nginx.conf
+vi /usr/local/php/etc/php-fpm.conf
+
+useradd gxt_upload -d /hdfs/wwwroot
+passwd gxt_upload
+	密码：upload@gxt#2015
+chown -R gxt_upload:gxt_upload /hdfs/wwwroot

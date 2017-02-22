@@ -1,0 +1,414 @@
+
+LNMP环境下的Nagios搭建
+
+Nagios监控端：192.168.50.36
+Nagios被监控端： 192.168.50.37
+
+mkdir /opt/nagios
+
+1 下载软件
+#wget http://downloads.sourceforge.net/project/nagios/nagios-3.x/nagios-3.5.0/nagios-3.5.0.tar.gz
+#wget http://nagios-plugins.org/download/nagios-plugins-1.4.16.tar.gz
+#wget http://prdownloads.sourceforge.net/sourceforge/nagios/nrpe-2.12.tar.gz
+
+
+2 安装GD库(Nagios中的statusmap和trends模块必须)
+yum -y install libgd2-noxpm libgd2-noxpm-devel
+
+3 Nagios监控端安装
+	创建Nagios用户及组
+	
+	1、创建Nagios用户及组
+	建立Nagios账号
+	#/usr/sbin/useradd -m -s /sbin/nologin nagios
+	
+	2、创建一个名为nagcmd的用户组，用于从web接口执行外部命令。将Nagios用户和Nginx用户加入组中。
+	#groupadd nagcmd
+	#usermod -a -G nagcmd nagios
+	#usermod -a -G nagcmd www
+	注：上面的www是Nginx用户所属的组，如有不同请自行调整。
+	
+4. 编译安装Nagios
+	wget http://downloads.sourceforge.net/project/nagios/nagios-3.x/nagios-3.5.0/nagios-3.5.0.tar.gz
+	#tar zxvf nagios-3.5.0.tar.gz
+	#cd nagios
+	#./configure --prefix=/usr/local/install/nagios --with-group=nagios --with-user=nagios --with-command-group=nagcmd --with-gd-lib=/usr/lib --with-gd-inc=/usr/include
+	
+	访问接口：
+			HTML URL:  http://localhost/nagios/
+			CGI URL:  http://localhost/nagios/cgi-bin/
+			Traceroute (used by WAP):  /bin/traceroute
+
+ 
+ 
+	#make all
+	#make install
+	#make install-init
+	#make install-config
+	#make install-commandmode
+	注：
+	make install 用于安装主要的程序、CGI及HTML文件
+	make install-init 用于生成init启动脚本
+	make install-config 用于安装示例配置文件
+	make install-commandmode 用于设置相应的目录权限
+	修改/usr/local/install/nagios/etc/objects/contacts.cfg
+	更改nagiosadmin 的联系人定义信息中的 Email 信息为你的 Email 以接收报警内容。
+	
+	
+	验证程序是否被正确安装
+	切换目录到安装路径，这里是/usr/local/install/nagios,看是否存在etc、bin、 sbin、 share、 var这五个目录
+	#ls /usr/local/install/nagios/
+	bin/     etc/     sbin/   share/   var/
+	注；bin–Nagios执行程序所在目录，其中的nagios文件即为主程序。
+	etc–Nagios配置文件位置
+	sbin–Nagioscgi文件所在目录，也就是执行外部命令所需文件所在的目录
+	Share–Nagios网页文件所在的目录
+	var–Nagios日志文件、spid 等文件所在的目录
+	var/archives–日志归档目录
+	var/rw–用来存放外部命令文件
+	
+	
+	
+5 编译并安装Nagios插件
+	由于Nagios主程序只是提供一个运行框架，其具体监控是靠运行在其下的插件完成的，所以Nagios插件是必须安装的。
+	wget http://nagios-plugins.org/download/nagios-plugins-1.4.16.tar.gz
+	#tar zxvf nagios-plugins-1.4.16.tar.gz
+	#cd nagios-plugins-1.4.16
+	#./configure --prefix=/usr/local/install/nagios --with-nagios-user=nagios --with-nagios-group=nagcmd
+	#make &&make install
+ 
+	验证Nagios插件是否正确安装
+	#ls /usr/local/install/nagios/libexec     #显示安装的插件文件
+
+	
+6、搭建 Perl 环境
+
+
+	yum install perl-ExtUtils-CBuilder perl-ExtUtils-MakeMaker
+	yum install -y perl-devel perl-CPAN	
+	
+	wget -c http://www.cpan.org/modules/by-module/FCGI/FCGI-0.74.tar.gz
+	
+	tar -zxvf FCGI-0.74.tar.gz
+	cd FCGI-0.74
+	perl Makefile.PL
+	make && make install
+	cd ..
+	---------------
+	
+	安装FCGI-ProcManager
+	wget http://www.cpan.org/authors/id/B/BO/BOBTFISH/FCGI-ProcManager-0.24.tar.gz
+	tar zxvf FCGI-ProcManager-0.24.tar.gz
+	cd FCGI-ProcManager-0.24
+	perl Makefile.PL
+	make && make install
+	cd ..	
+	-------------
+	安装IO/ALL 模块
+	wget http://www.cpan.org/authors/id/G/GB/GBARR/IO-1.25.tar.gz
+	tar zxvf IO-1.25.tar.gz
+	cd IO-1.25
+	perl Makefile.PL
+	#make &&make install
+	#cd ..
+	
+	wget -c http://search.cpan.org/CPAN/authors/id/I/IN/INGY/IO-All-0.46.tar.gz
+	tar zxvf IO-All-0.44.tar.gz
+	cd IO-All-0.44
+	perl Makefile.PL 
+	make &&make install
+
+/****	
+	#升级	MakeMaker
+	wget http://search.cpan.org/CPAN/authors/id/B/BI/BINGOS/ExtUtils-MakeMaker-7.24.tar.gz
+	tar zxvf ExtUtils-MakeMaker-6.62.tar.gz
+	cd ExtUtils-MakeMaker-6.62
+	perl Makefile.PL
+	make &&make install
+**/ 
+
+------------------------------------------------------------
+	安装perl fcgi 模块
+	wget http://search.cpan.org/CPAN/authors/id/E/ET/ETHER/FCGI-0.78.tar.gz
+	tar -zxvf FCGI-0.67.tar.gz
+	cd FCGI-0.67
+	perl Makefile.PL
+	make && make install
+
+	启动perl-cgi
+	wget http://www.linuxeye.com/uploads/allimg/120806/perl-fcgi.pl
+	cp perl-fcgi.pl /usr/local/nginx/
+	chmod 755 /usr/local/nginx/perl-fcgi.pl
+	
+	5. cgi启动/停止脚本 (www为nginx的运行用户)
+		vi /usr/local/nginx/start_perl_cgi.sh
+		
+		#!/bin/bash
+		#set -x
+		dir=/usr/local/nginx/
+
+		stop ()
+		{
+		#pkill  -f  $dir/perl-fcgi.pl
+		kill $(cat $dir/logs/perl-fcgi.pid)
+		rm $dir/logs/perl-fcgi.pid 2>/dev/null
+		rm $dir/logs/perl-fcgi.sock 2>/dev/null
+		echo "stop perl-fcgi done"
+		}
+		 
+		start ()
+		{
+		rm $dir/now_start_perl_fcgi.sh 2>/dev/null
+		 
+		chown www.www $dir/logs
+		echo "$dir/perl-fcgi.pl -l $dir/logs/perl-fcgi.log -pid $dir/logs/perl-fcgi.pid -S $dir/logs/perl-fcgi.sock" >>$dir/now_start_perl_fcgi.sh
+		 
+		chown www.www $dir/now_start_perl_fcgi.sh
+		chmod u+x $dir/now_start_perl_fcgi.sh
+		 
+		sudo -u www $dir/now_start_perl_fcgi.sh
+		echo "start perl-fcgi done"
+		}
+		 
+		case $1 in
+		stop)
+		stop
+		;;
+		start)
+		start
+		;;
+		restart)
+		stop
+		start
+		;;
+		esac
+
+		修改SHELL脚本权限
+		chmod 755 /usr/local/nginx/start_perl_cgi.sh
+
+
+		启动脚本
+		/usr/local/nginx/start_perl_cgi.sh start
+		正常情况下在/usr/local/nginx/logs 下生成 perl-fcgi.sock 这个文件,如果没有生成,那就要检查下上面的步聚了.
+
+		------------------
+		http://tool.oschina.net/htpasswd
+
+	--------------
+
+	我们使用 unix socket 来监听 perl CGI 请求并解析
+	cd /usr/local/install/nginx/sbin/	
+	上的那段代码copy下来，新建一个nginx-fcgi.pl放在/usr/local/install/nginx/sbin下
+	chmod +x nginx-fcgi.pl
+	启动nginx-fcgi.pl
+	/usr/local/nginx/sbin/nginx-fcgi.pl -l /usr/local/nginx/logs/nginx-fcgi.log -pid /usr/local/nginx/logs/nginx-fcgi.pid -S /usr/local/nginx/logs/nginx-fcgi.sock
+
+-------------
+	#vi nginx-cgi.pl，然后加入如下内容
+	#!/usr/bin/perl
+	use FCGI;
+	use Socket;
+	use FCGI::ProcManager;
+	sub shutdown { FCGI::CloseSocket($socket); exit; }
+	sub restart  { FCGI::CloseSocket($socket); &main; }
+	use sigtrap 'handler', \&shutdown, 'normal-signals';
+	use sigtrap 'handler', \&restart,  'HUP';
+	require 'syscall.ph';
+	use POSIX qw(setsid);
+
+	END()   { }
+	BEGIN() { }
+	{
+	  no warnings;
+	  *CORE::GLOBAL::exit = sub { die "fakeexit\nrc=" . shift() . "\n"; };
+	};
+	 
+	eval q{exit};
+	if ($@) {
+	  exit unless $@ =~ /^fakeexit/;
+	}
+	&main;
+	 
+	sub daemonize() {
+	chdir '/' or die "Can't chdir to /: $!";
+	defined( my $pid = fork ) or die "Can't fork: $!";
+	  exit if $pid;
+	setsid() or die "Can't start a new session: $!";
+	umask 0;
+	}
+	 
+	sub main {
+	  $proc_manager = FCGI::ProcManager->new( {n_processes => 5} );
+	  $socket = FCGI::OpenSocket( "127.0.0.1:8999", 10 )
+	  ; #use UNIX sockets - user running this script must have w access to the 'nginx' folder!!
+	  $request =
+	  FCGI::Request( \*STDIN, \*STDOUT, \*STDERR, \%req_params, $socket,
+	&FCGI::FAIL_ACCEPT_ON_INTR );
+	  $proc_manager->pm_manage();
+	  if ($request) { request_loop() }
+	  FCGI::CloseSocket($socket);
+	}
+	 
+	sub request_loop {
+	  while ( $request->Accept() >= 0 ) {
+		$proc_manager->pm_pre_dispatch();
+	 
+		#processing any STDIN input from WebServer (for CGI-POST actions)
+		$stdin_passthrough = '';
+		{ no warnings; $req_len = 0 + $req_params{'CONTENT_LENGTH'}; };
+		if ( ( $req_params{'REQUEST_METHOD'} eq 'POST' ) && ( $req_len != 0 ) ) {
+		  my $bytes_read = 0;
+		  while ( $bytes_read< $req_len ) {
+			my $data = '';
+			my $bytes = read( STDIN, $data, ( $req_len - $bytes_read ) );
+			last if ( $bytes == 0 || !defined($bytes) );
+			$stdin_passthrough .= $data;
+			$bytes_read += $bytes;
+		  }
+		}
+	 
+		#running the cgi app
+		if (
+		  ( -x $req_params{SCRIPT_FILENAME} ) &&    #can I execute this?
+		  ( -s $req_params{SCRIPT_FILENAME} ) &&    #Is this file empty?
+		  ( -r $req_params{SCRIPT_FILENAME} )       #can I read this file?
+		) {
+		  pipe( CHILD_RD,   PARENT_WR );
+		  pipe( PARENT_ERR, CHILD_ERR );
+		  my $pid = open( CHILD_O, "-|" );
+		  unless ( defined($pid) ) {
+			print("Content-type: text/plain\r\n\r\n");
+			print "Error: CGI app returned no output - Executing $req_params{SCRIPT_FILENAME} failed !\n";
+			next;
+		  }
+		  $oldfh = select(PARENT_ERR);
+		  $|     = 1;
+		  select(CHILD_O);
+		  $| = 1;
+		  select($oldfh);
+		  if ( $pid> 0 ) {
+			close(CHILD_RD);
+			close(CHILD_ERR);
+			print PARENT_WR $stdin_passthrough;
+			close(PARENT_WR);
+			$rin = $rout = $ein = $eout = '';
+	vec( $rin, fileno(CHILD_O),    1 ) = 1;
+	vec( $rin, fileno(PARENT_ERR), 1 ) = 1;
+			$ein    = $rin;
+			$nfound = 0;
+	 
+			while ( $nfound = select( $rout = $rin, undef, $ein = $eout, 10 ) ) {
+			  die "$!" unless $nfound != -1;
+			  $r1 = vec( $rout, fileno(PARENT_ERR), 1 ) == 1;
+			  $r2 = vec( $rout, fileno(CHILD_O),    1 ) == 1;
+			  $e1 = vec( $eout, fileno(PARENT_ERR), 1 ) == 1;
+			  $e2 = vec( $eout, fileno(CHILD_O),    1 ) == 1;
+	 
+			  if ($r1) {
+				while ( $bytes = read( PARENT_ERR, $errbytes, 4096 ) ) {
+				  print STDERR $errbytes;
+				}
+	if ($!) {
+				  $err = $!;
+	die $!;
+	vec( $rin, fileno(PARENT_ERR), 1 ) = 0
+				  unless ( $err == EINTR or $err == EAGAIN );
+				}
+			  }
+			  if ($r2) {
+				while ( $bytes = read( CHILD_O, $s, 4096 ) ) {
+				  print $s;
+				}
+				if ( !defined($bytes) ) {
+				  $err = $!;
+	die $!;
+	vec( $rin, fileno(CHILD_O), 1 ) = 0
+				  unless ( $err == EINTR or $err == EAGAIN );
+				}
+			  }
+			  last if ( $e1 || $e2 );
+			}
+			close CHILD_RD;
+			close PARENT_ERR;
+	waitpid( $pid, 0 );
+		  } else {
+	foreach $key ( keys %req_params ) {
+			  $ENV{$key} = $req_params{$key};
+			}
+	 
+			# cd to the script's local directory
+	if ( $req_params{SCRIPT_FILENAME} =~ /^(.*)\/[^\/] +$/ ) {
+	chdir $1;
+			}
+			close(PARENT_WR);
+			#close(PARENT_ERR);
+			close(STDIN);
+			close(STDERR);
+	 
+			#fcntl(CHILD_RD, F_DUPFD, 0);
+	syscall( &SYS_dup2, fileno(CHILD_RD),  0 );
+	syscall( &SYS_dup2, fileno(CHILD_ERR), 2 );
+	 
+			#open(STDIN, "<&CHILD_RD");
+			exec( $req_params{SCRIPT_FILENAME} );
+			die("exec failed");
+		  }
+		} else {
+		  print("Content-type: text/plain\r\n\r\n");
+		  print "Error: No such CGI app - $req_params{SCRIPT_FILENAME} may not exist or is not executable by this process.\n";
+		}
+	  }
+	}
+ 
+#chmod 777 nginx-cgi.pl
+
+#/usr/local/nginx/sbin/nginx-cgi.pl >/dev/null &   //启动FCGI
+#echo "/usr/local/nginx/sbin/nginx-fcgi.pl >/dev/null &" >>/etc/rc.local
+注：FCGI监听地址为127.0.0.1:8999，如想改变可以在nginx-cgi.pl内修改
+
+
+/usr/local/nginx/sbin/nginx-fcgi.pl -l /usr/local/nginx/logs/nginx-fcgi.log -pid /usr/local/nginx/logs/nginx-fcgi.pid -S /usr/local/nginx/logs/nginx-fcgi.sock
+	
+
+添加nginx帐户权限
+chown nagios:nagcmd /usr/local/nginx/logs/nginx-fcgi.sock
+chown nagios:nagcmd /usr/local/nginx/logs/nginx-fcgi.pid
+chmod 777 /usr/local/nginx/logs/nginx-fcgi.pid
+chmod 777 /usr/local/nginx/logs/nginx-fcgi.sock
+如果没有相关权限,访问的时候会报 502 错误.
+
+-----------
+
+Perl探针测试
+cd /usr/local/nginx/html
+wget http://www.linuxeye.com/uploads/allimg/120806/perlinfo.cgi
+
+--------------------------------------------------
+	
+/usr/local/install/nagios/share
+
+配置 Nginx
+==========================================
+nagios中 web 界面为cgi程序
+
+将nagios下share文件链接到网站根目录，并改名为nagios。
+ln -s /usr/local/install/nagios/share /hdfs/wwwroot/nagios
+#pwd
+/hdfs/wwwroot/nagios/share
+
+vi /usr/local/nginx/conf/nginx.conf
+server
+{
+    location ~ \.cgi$ 
+    {
+        root /usr/local/nagios/sbin;
+        rewrite ^/nagios/cgi-bin/(.*)\.cgi /$1.cgi break;
+        fastcgi_index index.cgi;
+        fastcgi_pass    unix:/usr/local/nginx/logs/nginx-fcgi.sock;
+
+        fastcgi_param   SCRIPT_FILENAME             /usr/local/nagios/sbin$fastcgi_script_name;
+        fastcgi_param   HTTP_ACCEPT_LANGUAGE        zh-cn;
+        include /usr/local/nginx/conf/fastcgi.conf;
+    }
+}
+	 

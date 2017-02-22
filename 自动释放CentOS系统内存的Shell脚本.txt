@@ -1,0 +1,35 @@
+
+脚本内容：
+ 
+复制代码 代码如下:
+
+    #! /bin/bash   
+    # cache：   
+    # To free pagecache:   
+    sync   
+    sync   
+    #echo 1 > /proc/sys/vm/drop_caches   
+    # To free dentries and inodes:   
+    #echo 2 > /proc/sys/vm/drop_caches   
+    # To free pagecache, dentries and inodes:   
+    echo 3 > /proc/sys/vm/drop_caches  
+	
+利用系统crontab实现每天自动运行：
+复制代码 代码如下:
+
+crontab -e
+
+输入以下内容：
+
+复制代码 代码如下:
+
+    00 00 * * * /root/Cached.sh  
+
+每天0点释放一次内存，这个时间可以根据自己需要修改设置
+ 
+在运行./Cached.sh时如果提示错误：Permission denied 权限的问题，可以运行：
+复制代码 代码如下:
+
+chmod +x .Cached.sh
+
+此外还可以通过修改/etc/sysctl.conf的方法来达到自动释放缓存的目的。但是内存不够用，最好还是去找找其他的原因，比如程序设置是否合理，是否突发访问量很大，或者程序设计不合理导致内存溢出等，毕竟操作系统本身设计会考虑各方面的问题，强制腾出cache的大小，可能只是把问题给暂时屏蔽了，不利于判断问题的所在。

@@ -1,0 +1,67 @@
+						----------oci8和pdo-oci 安装------------
+
+安装 oci8 ----------
+
+
+1  需要软件以及版本：
+	oracle-instantclient11.2-basic-11.2.0.3.0-1.x86_64.rpm
+	oracle-instantclient11.2-devel-11.2.0.3.0-1.x86_64.rpm
+	oracle-instantclient11.2-sqlplus-11.2.0.3.0-1.x86_64.rpm
+	oci8-2.0.12.tgz
+	
+	下载地址：http://www.oracle.com/technetwork/topics/linuxx86-64soft-092277.html	
+	  https://pecl.php.net/package/oci8
+2 安装流程：
+
+rpm -ivh oracle-instantclient11.2-basic-11.2.0.3.0-1.x86_64.rpm 
+rpm -ivh oracle-instantclient11.2-devel-11.2.0.3.0-1.x86_64.rpm
+rpm -ivh oracle-instantclient11.2-sqlplus-11.2.0.3.0-1.x86_64.rpm
+
+3. 操作流程
+root@centos#tar zxvf oci8-1.4.1.tgz
+root@centos#cd oci8-1.4.1
+root@centos#/usr/bin/phpize
+root@centos#./configure --with-php-config=/usr/local/php/bin/php-config  --with-oci8=shared,instantclient,/usr/lib/oracle/11.2/client64/lib
+root@centos#	make && make install
+
+
+4 添加php扩展。
+	修改	vi /usr/local/php/etc/php.ini
+	extension = oci8.so
+	
+5 重新启动php
+	# service php-fpm restart
+
+---------------
+安装PDO_OCI ----------
+
+用下面命令查看是否安装成功
+php -i | grep oci
+
+1. 安装oracle-instantclient11.2
+	上面已经安装。
+	
+2.# vi /etc/profile
+export ORACLE_HOME=/usr/lib/oracle/11.2/client64
+export LD_LIBRARY_PATH=$ORACLE_HOME/lib
+export NLS_LANG="AMERICAN_AMERICA.AL32UTF8"
+# source /etc/profile
+
+3. 进入nginx的目录，找到pdo-oci这个扩展。
+cd  /root/soft/lnmp1.3-full/src/php-5.6.22/ext/pdo_oci
+
+4. 生成配置文件
+	#/usr/bin/phpize  
+
+5  配置编译
+#./configure --with-php-config=/usr/local/php/bin/php-config --with-pdo-oci=instantclient,/usr,11.2
+	make && make install
+
+6 增加PHP扩展 #vi /usr/local/php/etc/php.ini
+	extension = pdo_oci.so
+
+7 重新启动php
+	# service php-fpm restart
+	
+------------------------
+参考教程：http://jingyan.baidu.com/article/36d6ed1f56d1fe1bcf488397.html
