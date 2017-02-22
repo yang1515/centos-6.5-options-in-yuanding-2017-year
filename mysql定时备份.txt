@@ -1,0 +1,203 @@
+
+mysql定时备份
+
+master机 发送文件：192.168.50.32
+slave机 接受文件   192.168.50.221
+
+所以在192.168.50.221上设置rsync监控， 其他机器发送文件过来就可以了。
+先备份master 192.168.50.32 机器上的文件，然后用rsync同步过去。
+
+----------------
+备份192.168.50.32上的mysql文件
+
+ssh: 192.168.50.32
+
+1、创建备份目录
+
+# root 用户,创建备份目录
+mkdir -p /bak/mysqlbak
+cd /bak/mysqlbak
+
+mysql：	root/Mysql_gxt@2015#$
+
+2、编写运行脚本
+
+vi  /usr/sbin/backup.sh
+
+#vi /backup/backup.sh
+
+#!/bin/bash
+# Name:backup.sh
+# This is a ShellScript For Auto DB Backup and Delete old Backup
+#
+backupdir=/bak/mysqlbak
+time=` date +%Y%m%d%H `
+mysqldump -u root -p pwd database | gzip > $backupdir/gxt-$time.sql.gz
+#
+find $backupdir -name "gxt_*.sql.gz" -type f -mtime +30 -exec rm {} \; > /dev/null 2>&1
+
+#
+
+3、为脚本添加执行权限
+
+# chmod +x /usr/sbin/backup.sh
+
+4 设置crontab定时执行
+
+crontab -e
+#在最后一行中加入：  
+00 3 * * * root /usr/sbin/backup.sh
+#表示每天3点00分执行备份
+
+5、重启crontab
+
+/etc/rc.d/init.d/crond restart  
+
+-----------------------
+
+RSync实现文件备份同步
+
+ssh: 192.168.50.221
+
+1 rsync用户默认是不存在的，需要创建用户
+	useradd rsync -s /sbin/nologin -M
+	cat  /etc/passwd
+	id rsync
+
+2 创建/backup目录，并且属主和属组都属于rsync
+	[root@rsync ~]# mkdir -p /home/mysql_backup_from_32/
+	[root@rsync ~]# chown -R rsync.rsync /home/mysql_backup_from_32/
+	[root@rsync ~]# ls -ld /home/mysql_backup_from_32/
+
+
+配置文件
+
+　　rsync的主要有以下三个配置文件rsyncd.conf(主配置文件)、rsyncd.secrets(密码文件)、rsyncd.motd(rysnc服务器信息)
+
+　　服务器配置文件(/etc/rsyncd.conf)，该文件默认不存在，请创建它。
+
+　　具体步骤如下：
+
+　　[192.168.50.221]# touch /etc/rsyncd.conf  #创建rsyncd.conf，这是rsync服务器的配置文件。
+　　[192.168.50.221]# touch /etc/rsyncd.secrets  #创建rsyncd.secrets ，这是用户密码文件。
+　　[192.168.50.221]# chmod 600 /etc/rsyncd.secrets  #将rsyncd.secrets这个密码文件的文件属性设为root拥有, 且权限要设为600, 否则无法备份成功!
+　　[192.168.50.221]# touch /etc/rsyncd.motd
+
+编辑rsync的主要配置文件
+vi /etc/rsyncd.conf
+
+uid = rsync
+gid = rsync
+use chroot = no
+max connections = 200
+timeout = 300
+
+pid file = /var/run/rsyncd.pid
+lock file = /var/run/rsync.lock
+log file = /var/log/rsyncd.log
+
+[backup]
+path = /home/mysql_backup_from_32/
+ignore errors
+read only = false
+list = false
+hosts allow = 192.168.50.0/24
+hosts deny = 0.0.0.0/32
+auth users = wxb2016
+secrets file = /etc/rsync.secrets
+
+#配置虚拟用户的密码文件
+vi  /etc/rsyncd.secrets
+	wxb2016:wxb@123
+
+
+chown root.root /etc/rsyncd.secrets
+chmod 600 /etc/rsyncd.secrets	#为密码文件提权，增加安全性
+
+#启动rsync 服务
+[192.168.50.221]# rsync --daemon   #启动rsync服务
+[192.168.50.221]# ps -ef |grep rsync
+[192.168.50.221]# netstat -lnutp |grep rsync
+
+---------------
+
+通过inotify-master[192.168.50.32]测试推送
+[192.168.50.32]#vi /etc/rsync.secrets
+wxb@123   #注意：这里只要写密码即可，切记。
+[192.168.50.32]# chmod 600 /etc/rsync.secrets
+
+[192.168.50.32]# rsync -avz /bak/mysqlbak/ wxb2016@192.168.50.221::backup
+注释：[::backup]这是模块名称，不是文件夹的名称。
+
+到此已经可以实现master机到slave机的推送文件了。
+
+添加到计划任务里面
+crontab -e
+20 3 * * * root rsync -avz /bak/mysqlbak/ wxb2016@192.168.50.221::backup --password-file=/etc/rsync.secrets
+-------------------------------
+
+
+建立连接到服务器的客户端看到的欢迎信息文件/etc/rsyncd/rsyncd.motd
+# vim /etc/rsyncd/rsyncd.motd
+
+查看873端口是否起来
+# netstat -an | grep 873
+
+启动rsync
+# /etc/init.d/xinetd restart
+
+客户端安装rsync
+# yum -y install rsync
+
+参考文档：
+http://www.cnblogs.com/zhenhui/p/5715840.html
+
+http://www.cnblogs.com/ityouknow/p/5923489.html
+http://chocolee.blog.51cto.com/8158455/1400596
+
+-----------------------------
+
+
+
+#!/bin/bash
+src=/data/                           # 需要同步的源路径
+des=data                             # 目标服务器上 rsync --daemon 发布的名称，rsync --daemon这里就不做介绍了，网上搜一下，比较简单。
+rsync_passwd_file=/etc/rsyncd.passwd            # rsync验证的密码文件
+ip1=192.168.0.18                 # 目标服务器1
+ip2=192.168.0.19                 # 目标服务器2
+user=root                            # rsync --daemon定义的验证用户名
+cd ${src}                              # 此方法中，由于rsync同步的特性，这里必须要先cd到源目录，inotify再监听 ./ 才能rsync同步后目录结构一致，有兴趣的同学可以进行各种尝试观看其效果
+/usr/local/bin/inotifywait -mrq --format  '%Xe %w%f' -e modify,create,delete,attrib,close_write,move ./ | while read file         # 把监控到有发生更改的"文件路径列表"循环
+do
+        INO_EVENT=$(echo $file | awk '{print $1}')      # 把inotify输出切割 把事件类型部分赋值给INO_EVENT
+        INO_FILE=$(echo $file | awk '{print $2}')       # 把inotify输出切割 把文件路径部分赋值给INO_FILE
+        echo "-------------------------------$(date)------------------------------------"
+        echo $file
+        #增加、修改、写入完成、移动进事件
+        #增、改放在同一个判断，因为他们都肯定是针对文件的操作，即使是新建目录，要同步的也只是一个空目录，不会影响速度。
+        if [[ $INO_EVENT =~ 'CREATE' ]] || [[ $INO_EVENT =~ 'MODIFY' ]] || [[ $INO_EVENT =~ 'CLOSE_WRITE' ]] || [[ $INO_EVENT =~ 'MOVED_TO' ]]         # 判断事件类型
+        then
+                echo 'CREATE or MODIFY or CLOSE_WRITE or MOVED_TO'
+                rsync -avzcR --password-file=${rsync_passwd_file} $(dirname ${INO_FILE}) ${user}@${ip1}::${des} &&         # INO_FILE变量代表路径哦  -c校验文件内容
+                rsync -avzcR --password-file=${rsync_passwd_file} $(dirname ${INO_FILE}) ${user}@${ip2}::${des}
+                 #仔细看 上面的rsync同步命令 源是用了$(dirname ${INO_FILE})变量 即每次只针对性的同步发生改变的文件的目录(只同步目标文件的方法在生产环境的某些极端环境下会漏文件 现在可以在不漏文件下也有不错的速度 做到平衡) 然后用-R参数把源的目录结构递归到目标后面 保证目录结构一致性
+        fi
+        #删除、移动出事件
+        if [[ $INO_EVENT =~ 'DELETE' ]] || [[ $INO_EVENT =~ 'MOVED_FROM' ]]
+        then
+                echo 'DELETE or MOVED_FROM'
+                rsync -avzR --delete --password-file=${rsync_passwd_file} $(dirname ${INO_FILE}) ${user}@${ip1}::${des} &&
+                rsync -avzR --delete --password-file=${rsync_passwd_file} $(dirname ${INO_FILE}) ${user}@${ip2}::${des}
+                #看rsync命令 如果直接同步已删除的路径${INO_FILE}会报no such or directory错误 所以这里同步的源是被删文件或目录的上一级路径，并加上--delete来删除目标上有而源中没有的文件，这里不能做到指定文件删除，如果删除的路径越靠近根，则同步的目录月多，同步删除的操作就越花时间。这里有更好方法的同学，欢迎交流。
+        fi
+        #修改属性事件 指 touch chgrp chmod chown等操作
+        if [[ $INO_EVENT =~ 'ATTRIB' ]]
+        then
+                echo 'ATTRIB'
+                if [ ! -d "$INO_FILE" ]                 # 如果修改属性的是目录 则不同步，因为同步目录会发生递归扫描，等此目录下的文件发生同步时，rsync会顺带更新此目录。
+                then
+                        rsync -avzcR --password-file=${rsync_passwd_file} $(dirname ${INO_FILE}) ${user}@${ip1}::${des} &&            
+                        rsync -avzcR --password-file=${rsync_passwd_file} $(dirname ${INO_FILE}) ${user}@${ip2}::${des}
+                fi
+        fi
+done
