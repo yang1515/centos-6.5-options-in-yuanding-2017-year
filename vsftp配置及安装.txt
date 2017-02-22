@@ -6,8 +6,8 @@ sftp配置及安装
 		
 	3)创建用户
 		useradd -s /sbin/nologin otpub_upload
-		passwd  otpub_upload
-				abc#123456
+		passwd  abc!@#$aasdf
+				
 			
 	4)配置vsftpd.conf主配置文件并作相应修改
 		cp /etc/vsftpd/vsftpd.conf /etc/vsftpd/vsftpd.conf.bak
